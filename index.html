@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mudanza de playlists · YouTube Music</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#0f0f12; --card:#18181d; --line:#2a2a31; --text:#ececf1; --muted:#9a9aa6;
+    --accent:#ff3b3b; --accent2:#ff6b6b; --ok:#3ecf8e; --warn:#f5b84b; --err:#ff6b6b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:28px 18px 60px}
+  header h1{margin:0 0 4px;font-size:26px;letter-spacing:-.02em}
+  header p{margin:0;color:var(--muted)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px}
+  .card h2{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:10px}
+  .step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;flex:none}
+  .sub{color:var(--muted);margin:0 0 14px;font-size:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input[type=text],select,input[type=number]{background:#101014;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font:inherit}
+  input[type=text]{flex:1;min-width:240px}
+  button,.btn{background:#26262e;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  button:hover:not(:disabled),.btn:hover{border-color:#44444f}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover:not(:disabled){background:var(--accent2)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.small{padding:5px 10px;font-size:13px}
+  label.btn input{display:none}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:#101014;border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 5px;font-size:14px}
+  .pill img{width:24px;height:24px;border-radius:50%}
+  .muted{color:var(--muted)}
+  code{background:#101014;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:13px}
+  details{margin-top:12px;color:var(--muted);font-size:14px}
+  details summary{cursor:pointer;color:var(--text)}
+  details ol{padding-left:20px}
+  .warnbox{background:#2b2210;border:1px solid #5a4416;color:#f5d48b;border-radius:10px;padding:10px 14px;margin-top:12px;font-size:14px}
+  .list{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:12px}
+  .list label{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+  .list label:last-child{border-bottom:0}
+  .list label:hover{background:#1e1e24}
+  .list .count{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:#26262e;color:var(--muted);white-space:nowrap}
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td input[type=text]{min-width:0;width:100%;padding:6px 8px}
+  .bar{height:10px;background:#101014;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--accent),#ff9a5a);width:0;transition:width .3s}
+  .bar.quota>div{background:linear-gradient(90deg,#4b8bf5,#8b6bf5)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}
+  .stat{background:#101014;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+  .stat span{color:var(--muted);font-size:12px}
+  #log{background:#0a0a0d;border:1px solid var(--line);border-radius:10px;padding:10px 12px;height:220px;overflow:auto;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:12px}
+  #log .ok{color:var(--ok)} #log .warn{color:var(--warn)} #log .err{color:var(--err)} #log .t{color:#5d5d68}
+  .empty{padding:18px;text-align:center;color:var(--muted)}
+  .spacer{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Mudanza de playlists · YouTube Music</h1>
+    <p>Copia tus playlists y tu música que te gusta de una cuenta de YouTube a otra. El progreso se guarda en este navegador, así que puedes pausar y continuar otro día.</p>
+  </header>
+
+  <div id="fileWarn" class="warnbox" hidden>
+    Estás abriendo la página como archivo (<code>file://</code>). El inicio de sesión de Google no funciona así: sírvela desde <code>http://localhost</code> (mira el README).
+  </div>
+
+  <!-- PASO 1 -->
+  <section class="card">
+    <h2><span class="step">1</span>Configuración</h2>
+    <p class="sub">Pega el <b>Client ID de OAuth</b> de tu proyecto de Google Cloud (con la YouTube Data API v3 habilitada).</p>
+    <div class="row">
+      <input type="text" id="clientId" placeholder="123456789-abc...apps.googleusercontent.com" spellcheck="false">
+      <button id="saveClient" class="primary">Guardar</button>
+    </div>
+    <details>
+      <summary>¿Cómo consigo el Client ID?</summary>
+      <ol>
+        <li>Entra en <b>console.cloud.google.com</b> y crea un proyecto.</li>
+        <li>En <i>APIs y servicios → Biblioteca</i>, busca <b>YouTube Data API v3</b> y pulsa <i>Habilitar</i>.</li>
+        <li>Configura la <i>pantalla de consentimiento de OAuth</i> como <b>Externa</b> y agrega como <b>usuarios de prueba</b> los correos de las dos cuentas (origen y destino).</li>
+        <li>En <i>Credenciales</i>, crea un <b>ID de cliente OAuth</b> de tipo <b>Aplicación web</b> y en <i>Orígenes de JavaScript autorizados</i> añade: <code id="originCode"></code></li>
+        <li>Copia el Client ID y pégalo aquí.</li>
+      </ol>
+    </details>
+  </section>
+
+  <!-- PASO 2 -->
+  <section class="card">
+    <h2><span class="step">2</span>Cuenta de origen: elige qué copiar</h2>
+    <p class="sub">Inicia sesión con la cuenta <b>antigua</b> y elige las playlists. Leer cuesta muy poca cuota. Si quieres, en vez de eso puedes importar los CSV de Google Takeout.</p>
+    <div class="row">
+      <button id="connectSrc" class="primary">Conectar cuenta de origen</button>
+      <span id="srcInfo"></span>
+      <span class="spacer"></span>
+      <label class="btn" title="Archivos .csv de Takeout → YouTube y YouTube Music → playlists">
+        Importar CSV de Takeout<input type="file" id="takeoutFiles" accept=".csv" multiple>
+      </label>
+    </div>
+    <div id="srcPanel" hidden>
+      <div class="row" style="margin-top:14px">
+        <button id="toggleAll" class="small">Seleccionar todas</button>
+        <label class="muted" style="display:flex;gap:6px;align-items:center;font-size:14px">
+          <input type="checkbox" id="onlyMusic" checked> En «Música que me gusta», incluir solo vídeos de la categoría Música
+        </label>
+      </div>
+      <div class="list" id="srcList"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="readSelected" class="primary">Añadir seleccionadas al plan</button>
+        <span id="readStatus" class="muted"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PASO 3 -->
+  <section class="card">
+    <h2><span class="step">3</span>Plan de transferencia</h2>
+    <p class="sub">Esto es lo que se va a crear en la cuenta nueva. Antes de empezar puedes cambiar los nombres o quitar listas.</p>
+    <div id="planTable"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="exportPlan" class="small">Exportar plan (.json)</button>
+      <label class="btn small" style="padding:5px 10px;font-size:13px">Importar plan<input type="file" id="importPlan" accept=".json"></label>
+      <button id="skippedCsv" class="small">Descargar omitidas (.csv)</button>
+      <span class="spacer"></span>
+      <button id="resetProgress" class="small">Reiniciar progreso</button>
+      <button id="clearPlan" class="small">Vaciar plan</button>
+    </div>
+  </section>
+
+  <!-- PASO 4 -->
+  <section class="card">
+    <h2><span class="step">4</span>Cuenta de destino: transferir</h2>
+    <p class="sub">Inicia sesión con la cuenta <b>nueva</b>. Esa cuenta tiene que tener un canal de YouTube creado.</p>
+    <div class="row">
+      <button id="connectDst" class="primary">Conectar cuenta de destino</button>
+      <span id="dstInfo"></span>
+      <span class="spacer"></span>
+      <label class="muted" style="font-size:14px">Privacidad
+        <select id="privacy">
+          <option value="private">Privada</option>
+          <option value="unlisted">No listada</option>
+          <option value="public">Pública</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="stDone">0</b><span>canciones copiadas</span></div>
+      <div class="stat"><b id="stPending">0</b><span>pendientes</span></div>
+      <div class="stat"><b id="stSkipped">0</b><span>omitidas (no disponibles)</span></div>
+      <div class="stat"><b id="stDays">–</b><span>días estimados con la cuota actual</span></div>
+    </div>
+
+    <p class="muted" style="margin:16px 0 6px;font-size:13px">Progreso total</p>
+    <div class="bar"><div id="progBar"></div></div>
+    <p class="muted" style="margin:14px 0 6px;font-size:13px">
+      Cuota de la API usada hoy (estimada): <b id="quotaText">0</b> / <input type="number" id="quotaLimit" min="1000" step="1000" style="width:100px;padding:3px 6px"> unidades
+      · quedan para ≈<b id="songsLeft">0</b> canciones hoy · se renueva a medianoche, hora del Pacífico
+    </p>
+    <div class="bar quota"><div id="quotaBar"></div></div>
+
+    <div class="row" style="margin-top:16px">
+      <button id="startBtn" class="primary">Iniciar transferencia</button>
+      <span id="runStatus" class="muted"></span>
+    </div>
+    <div id="log"></div>
+  </section>
+</div>
+
+<script>
+'use strict';
+/* ========= Constantes ========= */
+const SCOPE_READ  = 'https://www.googleapis.com/auth/youtube.readonly';
+const SCOPE_WRITE = 'https://www.googleapis.com/auth/youtube';
+const API = 'https://www.googleapis.com/youtube/v3/';
+const COST_WRITE = 50;          // playlists.insert y playlistItems.insert
+const MAX_PER_PLAYLIST = 5000;  // límite de YouTube por playlist
+const LS_KEY = 'ytm-mudanza-v1';
+const LIKED_ID = '__LIKED__';
+const QUOTA_REASONS = ['quotaExceeded', 'dailyLimitExceeded'];
+
+/* ========= Estado ========= */
+const defaults = { clientId:'', playlists:[], quota:{day:'', used:0}, quotaLimit:10000, privacy:'private' };
+let state = Object.assign({}, defaults, load() || {});
+const session = { src:null, dst:null };   // {token, exp, channel:{id,title,thumb}}
+let sourceList = [];
+let running = false, stopRequested = false;
+
+function load(){ try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; } }
+function save(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch(e){ log('No se pudo guardar el progreso en este navegador: ' + e.message, 'err'); }
+}
+
+/* ========= Utilidades ========= */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n.toLocaleString('es');
+function pacificDay(){ return new Date().toLocaleDateString('en-CA', {timeZone:'America/Los_Angeles'}); }
+function quotaUsed(){ return state.quota.day === pacificDay() ? state.quota.used : 0; }
+function addQuota(u){
+  const d = pacificDay();
+  if (state.quota.day !== d) state.quota = {day:d, used:0};
+  state.quota.used += u;
+}
+function log(msg, cls=''){
+  const el = $('log');
+  const t = new Date().toLocaleTimeString('es', {hour12:false});
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="t">${t}</span> <span class="${cls}">${esc(msg)}</span>`;
+  el.appendChild(line);
+  while (el.childNodes.length > 400) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function cleanTitle(t){ return (String(t || '').replace(/[<>]/g, '').trim() || 'Playlist sin título').slice(0, 150); }
+
+/* ========= API de YouTube ========= */
+class ApiError extends Error {
+  constructor(message, reason, status){ super(message); this.reason = reason || ''; this.status = status || 0; }
+}
+function isQuota(e){ return e instanceof ApiError && QUOTA_REASONS.includes(e.reason); }
+
+async function api(role, method, path, params = {}, body){
+  const s = session[role];
+  if (!s) throw new ApiError('La cuenta no está conectada.', 'notConnected');
+  if (Date.now() > s.exp) throw new ApiError('La sesión de Google expiró. Vuelve a conectar la cuenta y pulsa «Reanudar».', 'authExpired', 401);
+  const url = API + path + '?' + new URLSearchParams(params);
+  for (let attempt = 0; ; attempt++){
+    let res;
+    try {
+      res = await fetch(url, {
+        method,
+        headers: Object.assign({Authorization: 'Bearer ' + s.token}, body ? {'Content-Type':'application/json'} : {}),
+        body: body ? JSON.stringify(body) : undefined
+      });
+    } catch (netErr){
+      if (attempt < 4){ await sleep(1000 * 2 ** attempt); continue; }
+      throw new ApiError('Error de red: ' + netErr.message, 'network');
+    }
+    if (res.ok){
+      addQuota(method === 'GET' ? 1 : COST_WRITE);
+      return res.status === 204 ? {} : res.json();
+    }
+    let data = {}; try { data = await res.json(); } catch {}
+    const reason = data.error?.errors?.[0]?.reason || data.error?.status || '';
+    const msg = String(data.error?.message || res.statusText).replace(/<[^>]+>/g, '');
+    if (res.status === 401) throw new ApiError('La sesión de Google expiró. Vuelve a conectar la cuenta y pulsa «Reanudar».', 'authExpired', 401);
+    const retryable = res.status >= 500 || res.status === 409 ||
+      ['rateLimitExceeded','userRateLimitExceeded','backendError','SERVICE_UNAVAILABLE'].includes(reason);
+    if (retryable && attempt < 4){ await sleep(1500 * 2 ** attempt); continue; }
+    throw new ApiError(msg, reason, res.status);
+  }
+}
+
+async function paged(role, path, params, onPage){
+  let pageToken;
+  do {
+    const r = await api(role, 'GET', path, Object.assign({maxResults:50}, params, pageToken ? {pageToken} : {}));
+    onPage(r.items || []);
+    pageToken = r.nextPageToken;
+  } while (pageToken);
+}
+
+/* ========= Inicio de sesión (Google Identity Services) ========= */
+function requestToken(scope){
+  return new Promise((resolve, reject) => {
+    if (!window.google?.accounts?.oauth2) return reject(new Error('La librería de Google aún no ha cargado. Espera unos segundos y vuelve a intentarlo.'));
+    if (!state.clientId) return reject(new Error('Primero guarda tu Client ID (paso 1).'));
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: state.clientId,
+      scope,
+      prompt: 'select_account',
+      callback: resp => resp.error ? reject(new Error(resp.error_description || resp.error)) : resolve(resp),
+      error_callback: err => reject(new Error(err.type === 'popup_closed' ? 'Se cerró la ventana de inicio de sesión.' : (err.message || err.type)))
+    });
+    client.requestAccessToken();
+  });
+}
+
+async function connect(role){
+  const scope = role === 'src' ? SCOPE_READ : SCOPE_WRITE;
+  try {
+    const resp = await requestToken(scope);
+    if (!google.accounts.oauth2.hasGrantedAllScopes(resp, scope))
+      throw new Error('No se concedió el permiso para YouTube. Vuelve a intentarlo y marca la casilla de permisos.');
+    session[role] = { token: resp.access_token, exp: Date.now() + (Number(resp.expires_in || 3600) - 60) * 1000 };
+    const ch = await api(role, 'GET', 'channels', {part:'snippet', mine:'true'});
+    if (!ch.items?.length){
+      session[role] = null;
+      throw new Error('Esta cuenta no tiene canal de YouTube. Entra en youtube.com con ella, crea tu canal y vuelve a conectar.');
+    }
+    const c = ch.items[0];
+    session[role].channel = { id:c.id, title:c.snippet.title, thumb:c.snippet.thumbnails?.default?.url || '' };
+    log(`Conectada la cuenta de ${role === 'src' ? 'origen' : 'destino'}: ${c.snippet.title}`, 'ok');
+    if (session.src && session.dst && session.src.channel.id === session.dst.channel.id)
+      log('Atención: origen y destino son la misma cuenta. Conecta una cuenta distinta como destino.', 'warn');
+    if (role === 'src') await loadSourcePlaylists();
+  } catch (e){
+    log(e.message, 'err');
+  }
+  render();
+}
+
+/* ========= Origen ========= */
+async function loadSourcePlaylists(){
+  $('readStatus').textContent = 'Cargando playlists…';
+  const out = [];
+  try {
+    await paged('src', 'playlists', {part:'snippet,contentDetails', mine:'true'}, items => out.push(...items));
+  } catch (e){ log('No se pudieron listar las playlists: ' + e.message, 'err'); }
+  sourceList = [{id:LIKED_ID, title:'Música que me gusta', description:'', count:null, special:true}]
+    .concat(out.map(p => ({ id:p.id, title:p.snippet.title, description:p.snippet.description || '', count:p.contentDetails?.itemCount ?? null })));
+  $('readStatus').textContent = `${out.length} playlists encontradas.`;
+  renderSourceList();
+}
+
+function renderSourceList(){
+  $('srcPanel').hidden = !session.src;
+  const inPlan = new Set(state.playlists.map(p => p.sourceId));
+  $('srcList').innerHTML = sourceList.map(p => `
+    <label>
+      <input type="checkbox" value="${esc(p.id)}">
+      <span>${esc(p.title)}</span>
+      ${p.special ? '<span class="tag">Me gusta</span>' : ''}
+      ${inPlan.has(p.id) ? '<span class="tag">ya en el plan</span>' : ''}
+      <span class="count">${p.count == null ? '' : fmt(p.count) + ' canciones'}</span>
+    </label>`).join('') || '<div class="empty">No hay playlists</div>';
+}
+
+async function readSelected(){
+  const ids = [...$('srcList').querySelectorAll('input:checked')].map(i => i.value);
+  if (!ids.length) return log('Selecciona al menos una playlist.', 'warn');
+  $('readSelected').disabled = true;
+  const onlyMusic = $('onlyMusic').checked;
+  try {
+    for (const id of ids){
+      const p = sourceList.find(x => x.id === id);
+      const items = [];
+      $('readStatus').textContent = `Leyendo «${p.title}»…`;
+      if (id === LIKED_ID){
+        await paged('src', 'videos', {part:'snippet', myRating:'like'}, page => {
+          for (const v of page){
+            if (onlyMusic && v.snippet?.categoryId !== '10') continue;
+            items.push({ v:v.id, t:v.snippet?.title || '', s:'pending' });
+          }
+          $('readStatus').textContent = `Leyendo «${p.title}»… ${items.length}`;
+        });
+      } else {
+        await paged('src', 'playlistItems', {part:'snippet,contentDetails', playlistId:id}, page => {
+          for (const it of page){
+            const v = it.contentDetails?.videoId || it.snippet?.resourceId?.videoId;
+            if (!v) continue;
+            const t = it.snippet?.title || '';
+            const gone = t === 'Deleted video' || t === 'Private video';
+            items.push(gone ? { v, t, s:'skipped', r:'Vídeo eliminado o privado en el origen' } : { v, t, s:'pending' });
+          }
+          $('readStatus').textContent = `Leyendo «${p.title}»… ${items.length}`;
+        });
+      }
+      addToPlan({ sourceId:id, title:p.title, description:p.description, items });
+      log(`Añadida al plan: «${p.title}» (${items.length} canciones)`, 'ok');
+    }
+    $('readStatus').textContent = 'Listo.';
+  } catch (e){
+    log('Error leyendo el origen: ' + e.message, 'err');
+    $('readStatus').textContent = '';
+  }
+  $('readSelected').disabled = false;
+  save(); render();
+}
+
+/* Añade una playlist al plan: quita duplicados, la divide en partes de 5000 y combina con lo existente */
+function addToPlan({sourceId, title, description, items}){
+  const existing = state.playlists.filter(p => p.sourceId === sourceId);
+  const seen = new Set(existing.flatMap(p => p.items.map(i => i.v)));
+  let queue = items.filter(i => i.v && !seen.has(i.v) && seen.add(i.v));
+  if (!queue.length) return;
+  const isUpdate = existing.length > 0;
+  let added = 0;
+  // 1) rellenar las partes que ya existen hasta 5000
+  for (const p of existing){
+    const room = MAX_PER_PLAYLIST - p.items.length;
+    if (room <= 0 || !queue.length) continue;
+    const take = queue.slice(0, room); queue = queue.slice(room);
+    p.items.push(...take); added += take.length;
+  }
+  // 2) crear partes nuevas con lo que sobre
+  const totalParts = existing.length + Math.ceil(queue.length / MAX_PER_PLAYLIST);
+  let k = existing.length;
+  while (queue.length){
+    const chunk = queue.slice(0, MAX_PER_PLAYLIST); queue = queue.slice(MAX_PER_PLAYLIST);
+    state.playlists.push({
+      key: sourceId + (k ? `#${k + 1}` : ''), sourceId,
+      title: cleanTitle(totalParts > 1 ? `${title} (parte ${k + 1})` : title),
+      description: description || '',
+      destId: null, destChannel: null, excluded: false,
+      items: chunk
+    });
+    added += chunk.length; k++;
+  }
+  if (isUpdate) log(`«${title}»: ${added} canciones nuevas añadidas a lo que ya estaba en el plan`, 'ok');
+}
+
+/* ========= Takeout ========= */
+function splitCsvLine(line){
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < line.length; i++){
+    const c = line[i];
+    if (q){ if (c === '"' && line[i+1] === '"'){ cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ','){ out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+function parseTakeoutCsv(text, filename){
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  let title = filename.replace(/\.csv$/i, '').replace(/[-_ ]?(videos|vídeos)$/i, '').trim();
+  // Formato nuevo: la línea 0 es una cabecera con «Playlist title (original)» y la línea 1 sus valores
+  const head = splitCsvLine(lines[0] || '');
+  const ti = head.findIndex(h => /playlist title/i.test(h) || /t[ií]tulo/i.test(h));
+  if (ti >= 0 && lines[1]){ const vals = splitCsvLine(lines[1]); if (vals[ti]) title = vals[ti]; }
+  const start = lines.findIndex(l => /^\s*"?(video id|id del v[ií]deo|id de v[ií]deo)/i.test(l));
+  if (start < 0) return null;
+  const items = [];
+  for (let i = start + 1; i < lines.length; i++){
+    const v = splitCsvLine(lines[i])[0];
+    if (/^[\w-]{11}$/.test(v)) items.push({ v, t:'', s:'pending' });
+  }
+  return { title, items };
+}
+async function importTakeout(files){
+  let n = 0;
+  for (const f of files){
+    const parsed = parseTakeoutCsv(await f.text(), f.name);
+    if (!parsed){ log(`«${f.name}» no parece una playlist de Takeout (se ignora).`, 'warn'); continue; }
+    addToPlan({ sourceId:'takeout:' + f.name, title:parsed.title, description:'', items:parsed.items });
+    log(`Importada de Takeout: «${parsed.title}» (${parsed.items.length} canciones)`, 'ok');
+    n++;
+  }
+  if (n){ save(); render(); }
+}
+
+/* ========= Transferencia ========= */
+async function createDest(pl){
+  const r = await api('dst', 'POST', 'playlists', {part:'snippet,status'}, {
+    snippet: { title: cleanTitle(pl.title), description: String(pl.description || '').replace(/[<>]/g, '').slice(0, 5000) },
+    status: { privacyStatus: state.privacy }
+  });
+  pl.destId = r.id; pl.destChannel = session.dst.channel.id;
+  save();
+  log(`Creada la playlist «${pl.title}» en la cuenta nueva`, 'ok');
+}
+
+async function insertItem(pl, it){
+  const body = { snippet: { playlistId: pl.destId, resourceId: { kind:'youtube#video', videoId: it.v } } };
+  try {
+    await api('dst', 'POST', 'playlistItems', {part:'snippet'}, body);
+  } catch (e){
+    if (e.reason === 'playlistNotFound'){      // la borraron en destino: se vuelve a crear
+      log(`La playlist «${pl.title}» ya no existe en destino; se crea de nuevo.`, 'warn');
+      pl.items.forEach(i => { if (i.s === 'done') i.s = 'pending'; });
+      await createDest(pl);
+      body.snippet.playlistId = pl.destId;
+      await api('dst', 'POST', 'playlistItems', {part:'snippet'}, body);
+    } else throw e;
+  }
+}
+
+function friendlyReason(e){
+  return ({
+    videoNotFound: 'El vídeo ya no existe',
+    forbidden: 'No disponible para la cuenta o región de destino',
+    invalidValue: 'ID de vídeo no válido',
+    playlistItemsNotAccessible: 'No accesible'
+  })[e.reason] || e.message;
+}
+
+async function startTransfer(){
+  if (running){ stopRequested = true; $('runStatus').textContent = 'Pausando tras la canción actual…'; return; }
+  if (!session.dst) return log('Conecta primero la cuenta de destino.', 'err');
+  if (session.src && session.src.channel.id === session.dst.channel.id)
+    return log('Origen y destino son la misma cuenta. Conecta la cuenta nueva como destino.', 'err');
+  const foreign = state.playlists.find(p => p.destId && p.destChannel && p.destChannel !== session.dst.channel.id);
+  if (foreign)
+    return log(`Esta transferencia se empezó en otra cuenta de destino. Conecta esa cuenta o pulsa «Reiniciar progreso» para empezar de cero en «${session.dst.channel.title}».`, 'err');
+
+  running = true; stopRequested = false; render();
+  log('Transferencia iniciada.', 'ok');
+  let lastRender = 0;
+  try {
+    outer:
+    for (const pl of state.playlists){
+      if (pl.excluded) continue;
+      if (!pl.items.some(i => i.s === 'pending')) continue;
+      if (stopRequested) break;
+      if (!pl.destId) await createDest(pl);
+      for (const it of pl.items){
+        if (it.s !== 'pending') continue;
+        if (stopRequested) break outer;
+        $('runStatus').textContent = `Copiando «${pl.title}» → ${it.t || it.v}`;
+        try {
+          await insertItem(pl, it);
+          it.s = 'done';
+        } catch (e){
+          if (isQuota(e) || ['authExpired','youtubeSignupRequired','network','notConnected'].includes(e.reason)) throw e;
+          if (e.reason === 'playlistContainsMaximumNumberOfVideos'){
+            pl.items.forEach(i => { if (i.s === 'pending'){ i.s = 'skipped'; i.r = 'La playlist llegó al máximo de 5000'; } });
+            log(`«${pl.title}» llegó al máximo de canciones de YouTube.`, 'warn');
+            break;
+          }
+          it.s = 'skipped'; it.r = friendlyReason(e);
+          log(`Omitida: ${it.t || it.v} (${it.r})`, 'warn');
+        }
+        save();
+        if (Date.now() - lastRender > 400){ render(); lastRender = Date.now(); }
+        await sleep(200);
+      }
+    }
+    if (stopRequested) log('Transferencia pausada. Pulsa «Reanudar» para continuar.', 'warn');
+    else if (pendingTotal() === 0) log('¡Transferencia completada! 🎉', 'ok');
+  } catch (e){
+    if (isQuota(e)){
+      state.quota = { day: pacificDay(), used: Math.max(quotaUsed(), state.quotaLimit) };
+      log('Se agotó la cuota diaria de la API. El progreso está guardado: vuelve después de medianoche (hora del Pacífico), conecta la cuenta de destino y pulsa «Reanudar».', 'warn');
+    } else if (e.reason === 'youtubeSignupRequired'){
+      log('La cuenta de destino no tiene canal de YouTube. Créalo en youtube.com y vuelve a intentarlo.', 'err');
+    } else if (e.reason === 'authExpired'){
+      session.dst = null;
+      log(e.message, 'warn');
+    } else {
+      log('Error: ' + e.message, 'err');
+    }
+  } finally {
+    running = false; stopRequested = false;
+    $('runStatus').textContent = '';
+    save(); render();
+  }
+}
+
+/* ========= Cálculos ========= */
+function active(){ return state.playlists.filter(p => !p.excluded); }
+function pendingTotal(){ return active().reduce((n, p) => n + p.items.filter(i => i.s === 'pending').length, 0); }
+function unitsNeeded(){
+  return active().reduce((u, p) => {
+    const pend = p.items.filter(i => i.s === 'pending').length;
+    return u + pend * COST_WRITE + (pend && !p.destId ? COST_WRITE : 0);
+  }, 0);
+}
+
+/* ========= Render ========= */
+function accountPill(s){
+  if (!s?.channel) return '<span class="muted">No conectada</span>';
+  return `<span class="pill">${s.channel.thumb ? `<img src="${esc(s.channel.thumb)}" alt="">` : ''}${esc(s.channel.title)}</span>`;
+}
+
+function render(){
+  $('srcInfo').innerHTML = accountPill(session.src);
+  $('dstInfo').innerHTML = accountPill(session.dst);
+  $('srcPanel').hidden = !session.src;
+  $('privacy').value = state.privacy;
+  $('quotaLimit').value = state.quotaLimit;
+
+  // Tabla del plan
+  if (!state.playlists.length){
+    $('planTable').innerHTML = '<div class="empty">El plan está vacío. Añade playlists en el paso 2.</div>';
+  } else {
+    $('planTable').innerHTML = `<table>
+      <thead><tr><th style="width:34px">Incl.</th><th>Nombre en la cuenta nueva</th><th class="num">Total</th><th class="num">Copiadas</th><th class="num">Omitidas</th><th class="num">Pendientes</th><th></th></tr></thead>
+      <tbody>${state.playlists.map((p, idx) => {
+        const c = { done:0, skipped:0, pending:0 };
+        p.items.forEach(i => c[i.s]++);
+        const st = c.pending === 0 ? '<span class="tag" style="color:var(--ok)">completa</span>' : p.destId ? '<span class="tag">en curso</span>' : '';
+        return `<tr>
+          <td><input type="checkbox" data-incl="${idx}" ${p.excluded ? '' : 'checked'} ${running ? 'disabled' : ''}></td>
+          <td><input type="text" data-title="${idx}" value="${esc(p.title)}" ${p.destId || running ? 'disabled' : ''}> ${st}</td>
+          <td class="num">${fmt(p.items.length)}</td>
+          <td class="num">${fmt(c.done)}</td>
+          <td class="num">${fmt(c.skipped)}</td>
+          <td class="num">${fmt(c.pending)}</td>
+          <td><button class="small" data-del="${idx}" ${running ? 'disabled' : ''} title="Quitar del plan">✕</button></td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  // Estadísticas
+  let done = 0, skipped = 0, pending = 0, total = 0;
+  active().forEach(p => p.items.forEach(i => { total++; if (i.s === 'done') done++; else if (i.s === 'skipped') skipped++; else pending++; }));
+  $('stDone').textContent = fmt(done);
+  $('stPending').textContent = fmt(pending);
+  $('stSkipped').textContent = fmt(skipped);
+  const need = unitsNeeded();
+  const left = Math.max(0, state.quotaLimit - quotaUsed());
+  $('stDays').textContent = need === 0 ? '–' : need <= left ? 'hoy' : String(1 + Math.ceil((need - left) / state.quotaLimit));
+  $('progBar').style.width = total ? ((done + skipped) / total * 100) + '%' : '0';
+  $('quotaText').textContent = fmt(quotaUsed());
+  $('songsLeft').textContent = fmt(Math.floor(left / COST_WRITE));
+  $('quotaBar').style.width = Math.min(100, quotaUsed() / state.quotaLimit * 100) + '%';
+
+  // Botones
+  const started = state.playlists.some(p => p.destId || p.items.some(i => i.s === 'done'));
+  $('startBtn').textContent = running ? 'Pausar' : (started && pending ? 'Reanudar' : 'Iniciar transferencia');
+  $('startBtn').disabled = !running && (!session.dst || pending === 0);
+  ['connectSrc','connectDst','readSelected','clearPlan','resetProgress','privacy'].forEach(id => $(id).disabled = running);
+  $('connectSrc').textContent = session.src ? 'Cambiar cuenta de origen' : 'Conectar cuenta de origen';
+  $('connectDst').textContent = session.dst ? 'Cambiar cuenta de destino' : 'Conectar cuenta de destino';
+}
+
+/* ========= Eventos ========= */
+$('originCode').textContent = location.origin && location.origin !== 'null' ? location.origin : 'http://localhost:8080';
+$('fileWarn').hidden = location.protocol !== 'file:';
+$('clientId').value = state.clientId;
+
+$('saveClient').onclick = () => {
+  const v = $('clientId').value.trim();
+  if (!/\.apps\.googleusercontent\.com$/.test(v)) return log('Ese Client ID no parece válido: debe terminar en .apps.googleusercontent.com', 'err');
+  state.clientId = v; save(); log('Client ID guardado.', 'ok');
+};
+$('connectSrc').onclick = () => connect('src');
+$('connectDst').onclick = () => connect('dst');
+$('readSelected').onclick = readSelected;
+$('toggleAll').onclick = () => {
+  const boxes = [...$('srcList').querySelectorAll('input')];
+  const all = boxes.every(b => b.checked);
+  boxes.forEach(b => b.checked = !all);
+};
+$('takeoutFiles').onchange = e => { importTakeout([...e.target.files]); e.target.value = ''; };
+$('startBtn').onclick = startTransfer;
+$('privacy').onchange = e => { state.privacy = e.target.value; save(); };
+$('quotaLimit').onchange = e => { state.quotaLimit = Math.max(1000, Number(e.target.value) || 10000); save(); render(); };
+
+$('planTable').addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.incl != null){ state.playlists[+t.dataset.incl].excluded = !t.checked; }
+  if (t.dataset.title != null){ state.playlists[+t.dataset.title].title = cleanTitle(t.value); }
+  save(); render();
+});
+$('planTable').addEventListener('click', e => {
+  const i = e.target.dataset?.del;
+  if (i == null) return;
+  const p = state.playlists[+i];
+  if (!confirm(`¿Quitar «${p.title}» del plan?`)) return;
+  state.playlists.splice(+i, 1); save(); render(); renderSourceList();
+});
+
+$('exportPlan').onclick = () => download(`plan-playlists-${pacificDay()}.json`, JSON.stringify({version:1, playlists:state.playlists}), 'application/json');
+$('importPlan').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data.playlists)) throw new Error('formato no reconocido');
+    if (state.playlists.length && !confirm('Esto reemplaza el plan actual. ¿Continuar?')) return;
+    state.playlists = data.playlists; save(); render();
+    log(`Plan importado (${data.playlists.length} playlists).`, 'ok');
+  } catch (err){ log('No se pudo importar el plan: ' + err.message, 'err'); }
+};
+$('skippedCsv').onclick = () => {
+  const rows = [['Playlist','Video ID','Título','Motivo','Enlace']];
+  state.playlists.forEach(p => p.items.filter(i => i.s === 'skipped').forEach(i =>
+    rows.push([p.title, i.v, i.t || '', i.r || '', 'https://music.youtube.com/watch?v=' + i.v])));
+  if (rows.length === 1) return log('No hay canciones omitidas.', 'ok');
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  download('canciones-omitidas.csv', '﻿' + csv, 'text/csv');
+};
+$('resetProgress').onclick = () => {
+  if (!confirm('Esto marca todas las canciones como pendientes y olvida las playlists creadas en destino (no las borra). ¿Continuar?')) return;
+  state.playlists.forEach(p => { p.destId = null; p.destChannel = null; p.items.forEach(i => { if (i.s === 'done') i.s = 'pending'; }); });
+  save(); render(); log('Progreso reiniciado.', 'ok');
+};
+$('clearPlan').onclick = () => {
+  if (!confirm('¿Vaciar todo el plan?')) return;
+  state.playlists = []; save(); render(); renderSourceList();
+};
+
+render();
+if (state.playlists.length) log(`Plan cargado desde este navegador: ${state.playlists.length} playlists, ${fmt(pendingTotal())} canciones pendientes.`);
+</script>
+</body>
+</html>
